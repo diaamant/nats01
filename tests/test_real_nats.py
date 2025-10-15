@@ -1,0 +1,205 @@
+import pytest
+import asyncio
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from services.send_cmd import send_cmd_start, send_cmd_stop, send_cmd_status
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+class TestRealNATSIntegration:
+    """
+    Интеграционные тесты с реальным NATS сервером и Rust-приложением.
+
+    ВАЖНО: Для запуска этих тестов необходимо:
+    1. Запущенный NATS сервер на localhost:4222
+    2. Запущенное Rust-приложение, слушающее на канале "rec.control"
+
+    Запуск: pytest tests/test_real_nats.py -v -m integration
+    """
+
+    async def test_start_command_response(self):
+        """Тест реального ответа на команду start"""
+        response = await send_cmd_start()
+
+        # Проверяем структуру ответа
+        assert response.task_id == "task01"
+        assert response.msg_status == "success"
+        assert response.app_status == "started"
+
+        # Проверяем payload
+        assert response.payload is not None
+        assert response.payload.segment_time == 300.0
+        assert response.payload.file_path is not None
+        assert response.payload.file_path.startswith("/mnt/")
+        assert response.payload.file_path.endswith(".wav")
+        assert response.payload.at_started is not None
+        assert len(response.payload.at_started) > 0
+        # При старте at_stopped должен быть пустым
+        assert response.payload.at_stopped == "" or response.payload.at_stopped is None
+
+        print(f"✓ Start response validated: {response.payload.file_path}")
+
+    async def test_stop_command_response(self):
+        """Тест реального ответа на команду stop"""
+        response = await send_cmd_stop()
+
+        # Проверяем структуру ответа
+        assert response.task_id == "task01"
+        assert response.msg_status == "success"
+        assert response.app_status == "stopped"
+
+        # Проверяем payload
+        assert response.payload is not None
+        assert response.payload.segment_time == 300.0
+        assert response.payload.file_path is not None
+        assert response.payload.file_path.startswith("/mnt/")
+        assert response.payload.at_started is not None
+        assert response.payload.at_stopped is not None
+        assert len(response.payload.at_stopped) > 0
+
+        # Проверяем, что время остановки позже времени старта
+        assert response.payload.at_stopped >= response.payload.at_started
+
+        print(f"✓ Stop response validated: stopped at {response.payload.at_stopped}")
+
+    async def test_status_command_response(self):
+        """Тест реального ответа на команду status"""
+        response = await send_cmd_status()
+
+        # Проверяем структуру ответа
+        assert response.task_id == "task01"
+        assert response.msg_status == "success"
+        assert response.app_status in ["started", "stopped"]
+
+        # Проверяем payload
+        assert response.payload is not None
+        assert response.payload.segment_time == 300.0
+        assert response.payload.file_path is not None
+        assert response.payload.at_started is not None
+
+        print(f"✓ Status response validated: app_status={response.app_status}")
+
+    async def test_full_cycle_with_real_server(self):
+        """Тест полного цикла работы с реальным сервером"""
+
+        # 1. Запускаем запись
+        start_response = await send_cmd_start()
+        assert start_response.app_status == "started"
+        file_path = start_response.payload.file_path
+        at_started = start_response.payload.at_started
+
+        print(f"✓ Recording started: {file_path}")
+
+        # 2. Проверяем статус (должна идти запись)
+        await asyncio.sleep(0.5)  # Небольшая пауза
+        status_response = await send_cmd_status()
+        assert status_response.app_status in ["started", "stopped"]
+        assert status_response.payload.file_path == file_path
+
+        print(f"✓ Status checked: {status_response.app_status}")
+
+        # 3. Останавливаем запись
+        await asyncio.sleep(0.5)  # Небольшая пауза
+        stop_response = await send_cmd_stop()
+        assert stop_response.app_status == "stopped"
+        assert stop_response.payload.file_path == file_path
+        assert stop_response.payload.at_started == at_started
+        assert stop_response.payload.at_stopped is not None
+        assert len(stop_response.payload.at_stopped) > 0
+
+        print(f"✓ Recording stopped: {stop_response.payload.at_stopped}")
+
+        # 4. Проверяем финальный статус
+        await asyncio.sleep(0.5)
+        final_status = await send_cmd_status()
+        # Статус может быть как started (новая запись), так и stopped
+        assert final_status.msg_status == "success"
+
+        print(f"✓ Full cycle completed successfully")
+
+    async def test_response_timestamps_format(self):
+        """Тест формата временных меток в ответах"""
+        response = await send_cmd_start()
+
+        # Проверяем формат ISO 8601
+        at_started = response.payload.at_started
+        assert at_started is not None
+        assert "T" in at_started
+        assert "Z" in at_started or "+" in at_started
+
+        # Проверяем, что можно распарсить дату
+        from datetime import datetime
+
+        try:
+            # Пробуем распарсить как ISO формат
+            dt = datetime.fromisoformat(at_started.replace("Z", "+00:00"))
+            assert dt.year >= 2025
+            print(f"✓ Timestamp format valid: {at_started}")
+        except ValueError as e:
+            pytest.fail(f"Invalid timestamp format: {at_started}, error: {e}")
+
+    async def test_response_file_path_format(self):
+        """Тест формата пути к файлу в ответах"""
+        response = await send_cmd_start()
+
+        file_path = response.payload.file_path
+        assert file_path is not None
+        assert file_path.startswith("/mnt/")
+        assert file_path.endswith(".wav")
+        assert "rec" in file_path.lower()
+
+        print(f"✓ File path format valid: {file_path}")
+
+    async def test_response_segment_time_consistency(self):
+        """Тест согласованности segment_time в ответах"""
+        start_response = await send_cmd_start()
+
+        assert start_response.payload.segment_time == 300.0
+
+        await asyncio.sleep(0.5)
+        status_response = await send_cmd_status()
+        assert status_response.payload.segment_time == 300.0
+
+        await asyncio.sleep(0.5)
+        stop_response = await send_cmd_stop()
+        assert stop_response.payload.segment_time == 300.0
+
+        print(f"✓ Segment time consistent across all responses: 300.0")
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+class TestRealNATSErrorHandling:
+    """Тесты обработки ошибок с реальным сервером"""
+
+    async def test_multiple_start_commands(self):
+        """Тест отправки нескольких команд start подряд"""
+        response1 = await send_cmd_start()
+        assert response1.msg_status == "success"
+
+        await asyncio.sleep(0.5)
+
+        # Вторая команда start - поведение зависит от реализации Rust
+        response2 = await send_cmd_start()
+        # Может быть success (перезапуск) или error (уже запущено)
+        assert response2.msg_status in ["success", "error"]
+
+        print(f"✓ Multiple start handling: {response2.msg_status}")
+
+    async def test_stop_without_start(self):
+        """Тест команды stop без предварительного start"""
+        # Сначала убедимся, что запись остановлена
+        await send_cmd_stop()
+        await asyncio.sleep(0.5)
+
+        # Пытаемся остановить снова
+        response = await send_cmd_stop()
+        # Может вернуть success (уже остановлено) или error
+        assert response.msg_status in ["success", "error"]
+
+        print(f"✓ Stop without start handling: {response.msg_status}")
