@@ -6,31 +6,6 @@ Python-клиент для взаимодействия с Rust-приложен
 
 Проект предоставляет асинхронный клиент для отправки команд управления через NATS message broker. Поддерживает команды `start`, `stop`, `status`.
 
-## Архитектура проекта
-
-```
-nats01/
-├── clients/                    # NATS клиент
-│   ├── __init__.py
-│   └── nats_client.py         # NATSClient с переиспользованием соединения
-├── core/                       # Ядро приложения
-│   ├── __init__.py
-│   └── config.py              # Конфигурация приложения
-├── models/                     # Pydantic модели
-│   └── cmd.py                 # CommandMessage, ResponseMessage
-├── services/                   # Бизнес-логика
-│   └── send_cmd.py            # send_cmd_start, send_cmd_stop, send_cmd_status
-├── tests/                      # Тесты
-│   ├── test_commands.py       # Unit-тесты моделей (15 тестов)
-│   ├── test_integration.py    # Интеграционные тесты с моками (5 тестов)
-│   ├── test_real_nats.py      # Тесты с реальным NATS (9 тестов)
-│   └── README.md              # Документация по тестам
-├── doc/                        # Документация
-│   └── msg_format.md          # Формат сообщений
-├── main.py                     # Точка входа
-├── pyproject.toml             # Конфигурация проекта
-└── README.md                  # Этот файл
-```
 
 ## Ключевые особенности
 
@@ -55,7 +30,7 @@ nats01/
 ## Установка
 
 ### Требования
-- Python >= 3.13
+- Python >= 3.12
 - NATS сервер (для интеграционных тестов и работы)
 - Rust-приложение (для работы с реальным сервером)
 
@@ -63,13 +38,48 @@ nats01/
 
 ```bash
 # Создание виртуального окружения
-python3 -m venv .venv
+uv venv
 
 # Активация
 source .venv/bin/activate
 
 # Установка зависимостей
-pip install nats-py pydantic pytest pytest-asyncio
+uv pip install nats-py pydantic pytest pytest-asyncio
+```
+
+### Установка сервера NUTS
+
+```bash
+# Debian, Ubuntu
+sudo apt install nats-server
+
+sudo systemctl status nats-server.service
+```
+
+## Архитектура проекта
+
+```
+nats01/
+├── clients/                    # NATS клиент
+│   ├── __init__.py
+│   └── nats_client.py         # NATSClient с переиспользованием соединения
+├── core/                       # Ядро приложения
+│   ├── __init__.py
+│   └── config.py              # Конфигурация приложения
+├── models/                     # Pydantic модели
+│   └── cmd.py                 # CommandMessage, ResponseMessage
+├── services/                   # Бизнес-логика
+│   └── send_cmd.py            # send_cmd_start, send_cmd_stop, send_cmd_status
+├── tests/                      # Тесты
+│   ├── test_commands.py       # Unit-тесты моделей (15 тестов)
+│   ├── test_integration.py    # Интеграционные тесты с моками (5 тестов)
+│   ├── test_real_nats.py      # Тесты с реальным NATS (9 тестов)
+│   └── README.md              # Документация по тестам
+├── doc/                        # Документация
+│   └── msg_format.md          # Формат сообщений
+├── main.py                     # Точка входа
+├── pyproject.toml             # Конфигурация проекта
+└── README.md                  # Этот файл
 ```
 
 ## Использование

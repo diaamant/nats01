@@ -1,3 +1,18 @@
+========================================================================
+# Other Linux
+----------------------
+curl -fsSL https://binaries.nats.dev/nats-io/nats-server/v2@v2.11.6 | sh
+-------------------------------
+curl -fsSL https://binaries.nats.dev/nats-io/nats-server/v2@latest | sh
+------------------------------------------------------------------------
+
+## Копирование в системную директорию:
+sudo mv ./nats-server /usr/local/bin/
+sudo chmod +x /usr/local/bin/nats-server
+
+==================================================
+sudo nano /etc/systemd/system/nats-server.service
+[----------------------------------------------
 [Unit]
 Description=NATS Server
 After=network.target
@@ -12,3 +27,27 @@ LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
+----------------------------------------------------]
+
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable nats-server.service
+sudo systemctl start nats-server.service
+sudo systemctl status nats-server.service
+
+
+
+
+======================================================
+Использование установки в домашнюю директорию:
+[---------------------------------------------
+echo 'export PATH="$PATH:$(pwd)"' >> ~/.bashrc
+source ~/.bashrc
+
+========================================================================
+
+
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin nats
+
+sudo mkdir -p /var/log/nats /var/lib/nats/jetstream /etc/nats
+sudo chown -R nats:nats /var/log/nats /var/lib/nats /etc/nats
