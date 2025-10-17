@@ -73,11 +73,62 @@ async def main_async():
     logger.info("All commands completed successfully")
 
 
+async def start_multiple_tasks() -> List[ResponseMessage]:
+    """
+    Параллельно отправляет команду 'start' для нескольких задач,
+    используя asyncio.gather.
+    """
+    logger = logging.getLogger(__name__)
+
+    # 1. Получаем NATS-клиент через контекстный менеджер
+    async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        # 2. Инициализируем сервис
+        service = ManagerService(
+            client=client,
+            config=app_config,
+            nats_subject=nats_config.subject,
+        )
+
+        # Список ID задач
+        tasks = ["rec_task_A", "rec_task_B", "rec_task_C"]
+        logger.info(f"Preparing to start {len(tasks)} tasks concurrently: {tasks}")
+
+        # Параметры по умолчанию, или можно использовать разные для каждой задачи
+        default_payload = StartPayload(segment_time=120.0, vid_byterate=2500)
+
+        # 3. Создаем список асинхронных вызовов
+        commands = [
+            service.start(payload=default_payload, task_id=task_id) for task_id in tasks
+        ]
+
+        # 4. Параллельно запускаем все команды и ожидаем результаты
+        responses = await asyncio.gather(*commands, return_exceptions=True)
+
+        logger.info("--- Results Summary ---")
+        for task_id, response in zip(tasks, responses):
+            if isinstance(response, ResponseMessage):
+                logger.info(
+                    f"Task {task_id}: SUCCESS. Status: {response.app_status}, "
+                    f"Msg: {response.msg_status}"
+                )
+            else:
+                logger.error(
+                    f"Task {task_id}: FAILED. Exception: {response.__class__.__name__}, "
+                    f"Message: {response}"
+                )
+        logger.info("-----------------------")
+
+        return responses
+
+
 def main():
     """Main entry point"""
     setup_logging()
 
     asyncio.run(main_async())
+
+    # 'start' нескольких задач
+    asyncio.run(start_multiple_tasks())
 
 
 if __name__ == "__main__":
