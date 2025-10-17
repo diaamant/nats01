@@ -1,5 +1,5 @@
 """NATS client module"""
 
-from .nats_client import NATSClient
+from .nats_client import NatsClient
 
-__all__ = ["NATSClient"]
+__all__ = ["NatsClient"]

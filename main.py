@@ -4,8 +4,10 @@ import asyncio
 import logging
 import sys
 
-from core.config import app_config
-from services.send_cmd import send_cmd_start, send_cmd_stop, send_cmd_status
+from clients.nats_client import get_nats_client
+from core.config import app_config, nats_config
+from models.cmd import StartPayload, StopPayload
+from services.send_cmd import ManagerService
 
 
 def setup_logging():
@@ -21,26 +23,30 @@ async def main_async():
     """Async main function to run commands"""
     logger = logging.getLogger(__name__)
 
-    try:
-        logger.info("Starting command execution...")
+    async with get_nats_client(nats_config.url, nats_config.timeout) as nats_client:
+        # Сервис создается один раз и переиспользуется
+        recording_service = ManagerService(
+            client=nats_client,
+            config=app_config,
+            nats_subject=nats_config.subject,
+        )
 
-        # Start recording
-        start_response = await send_cmd_start()
-        print(f"✓ Start: {start_response.payload.file_path}")
+        # Теперь можно вызывать методы сервиса
+        try:
+            # 1. Проверяем статус
+            await recording_service.status()
 
-        # Stop recording
-        stop_response = await send_cmd_stop()
-        print(f"✓ Stop: {stop_response.payload.at_stopped}")
+            # 2. Начинаем запись с кастомными параметрами
+            start_params = StartPayload(vid_byterate=2500, segment_time=60)
+            await recording_service.start(payload=start_params)
 
-        # Check status
-        status_response = await send_cmd_status()
-        print(f"✓ Status: {status_response.app_status}")
+            # 3. Останавливаем запись
+            await recording_service.stop(payload=StopPayload())
 
-        logger.info("All commands completed successfully")
+        except Exception as e:
+            logger.critical(f"An operation failed in the main workflow: {e}")
 
-    except Exception as e:
-        logger.error(f"Error during command execution: {e}", exc_info=True)
-        sys.exit(1)
+    logger.info("All commands completed successfully")
 
 
 def main():
