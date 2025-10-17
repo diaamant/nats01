@@ -3,10 +3,11 @@
 import asyncio
 import logging
 import sys
+from typing import List
 
 from clients.nats_client import get_nats_client
 from core.config import app_config, nats_config
-from models.cmd import StartPayload, StopPayload
+from models.cmd import StartPayload, StopPayload, ResponseMessage
 from services.send_cmd import ManagerService
 
 
@@ -31,20 +32,43 @@ async def main_async():
             nats_subject=nats_config.subject,
         )
 
-        # Теперь можно вызывать методы сервиса
+        # ----------------------------------------------------------------------
+        # Пример использования с Пользовательскими параметрами
+        # ----------------------------------------------------------------------
         try:
-            # 1. Проверяем статус
-            await recording_service.status()
+            # 1. Определяем кастомные параметры старта записи
+            custom_start_params = StartPayload(
+                segment_time=600.0,  # Записывать сегменты по 10 минут
+                snd_source="microphone_array",  # Кастомный источник звука
+                snd_byterate=128,  # Более высокая частота звука
+                vid_byterate=3000,  # Высокий битрейт видео
+                vid_stream="high_res",  # Кастомный видеопоток
+            )
 
-            # 2. Начинаем запись с кастомными параметрами
-            start_params = StartPayload(vid_byterate=2500, segment_time=60)
-            await recording_service.start(payload=start_params)
+            # 2. Отправляем команду "старт" с кастомными параметрами и кастомным task_id
+            logger.info(
+                "Sending 'start' command with custom parameters for task 'custom_rec'"
+            )
+            start_response = await recording_service.start(
+                payload=custom_start_params, task_id="custom_rec"
+            )
+            logger.info(f"Start Response: {start_response}")
 
-            # 3. Останавливаем запись
-            await recording_service.stop(payload=StopPayload())
+            # 3. Проверяем статус для кастомной задачи
+            logger.info("Sending 'status' command for task 'custom_rec'")
+            status_response = await recording_service.status(task_id="custom_rec")
+            logger.info(f"Status Response: {status_response}")
+
+            # 4. Отправляем команду "стоп" для кастомной задачи
+            logger.info("Sending 'stop' command for task 'custom_rec'")
+            stop_response = await recording_service.stop(
+                payload=StopPayload(), task_id="custom_rec"
+            )
+            logger.info(f"Stop Response: {stop_response}")
 
         except Exception as e:
             logger.critical(f"An operation failed in the main workflow: {e}")
+        # ----------------------------------------------------------------------
 
     logger.info("All commands completed successfully")
 
@@ -52,6 +76,7 @@ async def main_async():
 def main():
     """Main entry point"""
     setup_logging()
+
     asyncio.run(main_async())
 
 

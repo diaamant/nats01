@@ -69,7 +69,7 @@ nats01/
 ├── models/                     # Pydantic модели
 │   └── cmd.py                 # CommandMessage, ResponseMessage
 ├── services/                   # Бизнес-логика
-│   └── send_cmd.py            # send_cmd_start, send_cmd_stop, send_cmd_status
+│   └── send_cmd.py            # ManagerService для управления командами
 ├── tests/                      # Тесты
 │   ├── test_commands.py       # Unit-тесты моделей (15 тестов)
 │   ├── test_integration.py    # Интеграционные тесты с моками (5 тестов)
@@ -88,20 +88,32 @@ nats01/
 
 ```python
 import asyncio
-from services.send_cmd import send_cmd_start, send_cmd_stop, send_cmd_status
+from clients.nats_client import get_nats_client
+from core.config import app_config, nats_config
+from models.cmd import StartPayload, StopPayload
+from services.send_cmd import ManagerService
 
 async def main():
-    # Запуск записи
-    response = await send_cmd_start()
-    print(f"Started: {response.payload.file_path}")
-    
-    # Проверка статуса
-    status = await send_cmd_status()
-    print(f"Status: {status.app_status}")
-    
-    # Остановка записи
-    stop_response = await send_cmd_stop()
-    print(f"Stopped at: {stop_response.payload.at_stopped}")
+    async with get_nats_client(nats_config.url, nats_config.timeout) as nats_client:
+        # Создаем сервис
+        service = ManagerService(
+            client=nats_client,
+            config=app_config,
+            nats_subject=nats_config.subject,
+        )        
+      
+        # Запуск записи с кастомными параметрами
+        start_params = StartPayload(vid_byterate=2500, segment_time=60)
+        response = await service.start(payload=start_params)
+        print(f"Started: {response.payload.file_path}")
+        
+        # Проверка статуса
+        status = await service.status()
+        print(f"Status: {status.app_status}")
+        
+        # Остановка записи
+        stop_response = await service.stop(payload=StopPayload())
+        print(f"Stopped at: {stop_response.payload.at_stopped}")
 
 asyncio.run(main())
 ```
@@ -116,21 +128,109 @@ source .venv/bin/activate
 python main.py
 ```
 
-### Использование NATSClient напрямую
+
+### Пользовательские параметры
 
 ```python
-from clients.nats_client import get_nats_client
-from models.cmd import CommandMessage, CommandPayload
 
-async def custom_command():
-    async with get_nats_client() as client:
-        cmd = CommandMessage(
-            task_id="my_task",
-            cmd="start",
-            payload=CommandPayload(segment_time=600.0)
+async def main_async():
+    """Async main function to run commands"""
+    logger = logging.getLogger(__name__)
+
+    async with get_nats_client(nats_config.url, nats_config.timeout) as nats_client:
+        # Сервис создается один раз и переиспользуется
+        recording_service = ManagerService(
+            client=nats_client,
+            config=app_config,
+            nats_subject=nats_config.subject,
         )
-        response = await client.send_command("rec.control", cmd)
-        return response
+
+        try:
+            # 1. Определяем кастомные параметры старта записи
+            custom_start_params = StartPayload(
+                segment_time=600.0,  # Записывать сегменты по 10 минут
+                snd_source="microphone_array",  # Кастомный источник звука
+                snd_byterate=128,  # Более высокая частота звука
+                vid_byterate=3000,  # Высокий битрейт видео
+                vid_stream="high_res"  # Кастомный видеопоток
+            )
+
+            # 2. Отправляем команду "старт" с кастомными параметрами и кастомным task_id
+            logger.info("Sending 'start' command with custom parameters for task 'custom_rec'")
+            start_response = await recording_service.start(
+                payload=custom_start_params,
+                task_id="custom_rec"
+            )
+            logger.info(f"Start Response: {start_response}")
+
+            # 3. Проверяем статус для кастомной задачи
+            logger.info("Sending 'status' command for task 'custom_rec'")
+            status_response = await recording_service.status(task_id="custom_rec")
+            logger.info(f"Status Response: {status_response}")
+
+            # 4. Отправляем команду "стоп" для кастомной задачи
+            logger.info("Sending 'stop' command for task 'custom_rec'")
+            stop_response = await recording_service.stop(
+                payload=StopPayload(),
+                task_id="custom_rec"
+            )
+            logger.info(f"Stop Response: {stop_response}")
+
+        except Exception as e:
+            logger.critical(f"An operation failed in the main workflow: {e}")
+```
+
+
+### Работа с несколькими задачами
+
+```python
+async def start_multiple_tasks() -> List[ResponseMessage]:
+    """
+    Параллельно отправляет команду 'start' для нескольких задач, 
+    используя asyncio.gather.
+    """
+    logger = logging.getLogger(__name__)
+    
+    # 1. Получаем NATS-клиент через контекстный менеджер
+    async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        # 2. Инициализируем сервис
+        service = ManagerService(
+            client=client,
+            config=app_config,
+            nats_subject=nats_config.subject,
+        )
+        
+        # Список ID задач
+        tasks = ["rec_task_A", "rec_task_B", "rec_task_C"]
+        logger.info(f"Preparing to start {len(tasks)} tasks concurrently: {tasks}")
+        
+        # Параметры по умолчанию, или можно использовать разные для каждой задачи
+        default_payload = StartPayload(segment_time=120.0, vid_byterate=2500)
+
+        # 3. Создаем список асинхронных вызовов
+        commands = [
+            service.start(payload=default_payload, task_id=task_id)
+            for task_id in tasks
+        ]
+
+        # 4. Параллельно запускаем все команды и ожидаем результаты
+        responses = await asyncio.gather(*commands, return_exceptions=True)
+        
+        logger.info("--- Results Summary ---")
+        for task_id, response in zip(tasks, responses):
+            if isinstance(response, ResponseMessage):
+                logger.info(
+                    f"Task {task_id}: SUCCESS. Status: {response.app_status}, "
+                    f"Msg: {response.msg_status}"
+                )
+            else:
+                logger.error(
+                    f"Task {task_id}: FAILED. Exception: {response.__class__.__name__}, "
+                    f"Message: {response}"
+                )
+        logger.info("-----------------------")
+        
+        return responses
 ```
 
 ## Конфигурация
@@ -247,56 +347,6 @@ pytest tests/test_real_nats.py -v -m integration
 
 Подробнее: [`tests/README.md`](tests/README.md)
 
-## Примеры использования
-
-### Пользовательские параметры
-
-```python
-from services.send_cmd import send_cmd_start
-
-# С пользовательскими параметрами
-response = await send_cmd_start(
-    task_id="custom_task",
-    segment_time=600.0,
-    snd_source="custom_source",
-    snd_byterate=128
-)
-```
-
-### Обработка ошибок
-
-```python
-from services.send_cmd import send_cmd_start
-import logging
-
-logger = logging.getLogger(__name__)
-
-try:
-    response = await send_cmd_start()
-    if response.msg_status == "error":
-        logger.error(f"Command failed: {response.app_status}")
-    else:
-        logger.info(f"Success: {response.payload.file_path}")
-except TimeoutError:
-    logger.error("NATS request timeout")
-except ConnectionError:
-    logger.error("NATS connection failed")
-```
-
-### Работа с несколькими задачами
-
-```python
-import asyncio
-from services.send_cmd import send_cmd_start
-
-async def start_multiple_tasks():
-    tasks = ["task01", "task02", "task03"]
-    responses = await asyncio.gather(*[
-        send_cmd_start(task_id=task_id)
-        for task_id in tasks
-    ])
-    return responses
-```
 
 ## Разработка
 
@@ -306,21 +356,6 @@ async def start_multiple_tasks():
 - Логирование важных операций
 - Обработка ошибок
 - Тесты для нового функционала
-
-### Добавление новой команды
-
-1. Добавить тип команды в `models/cmd.py`:
-```python
-cmd: Literal["start", "stop", "status", "pause"]
-```
-
-2. Создать функцию в `services/send_cmd.py`:
-```python
-async def send_cmd_pause(task_id: str = None) -> ResponseMessage:
-    # Реализация
-```
-
-3. Добавить тесты в `tests/test_commands.py`
 
 ## Документация
 
