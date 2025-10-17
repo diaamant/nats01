@@ -35,7 +35,7 @@ class ManagerService:
         """
         Private helper to construct, send a command, and handle errors centrally.
         """
-        effective_task_id = task_id or self._config.task_id
+        effective_task_id = task_id or self._config.TASK_ID
         if not effective_task_id:
             raise ValueError("Task ID must be provided or set in the config.")
 

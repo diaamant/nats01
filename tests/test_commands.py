@@ -192,7 +192,7 @@ class TestNATSCommunication:
         mock_client = AsyncMock()
         mock_client.send_command.return_value = mock_response
 
-        mock_config = AppConfig(task_id="task01", log_level="INFO")
+        mock_config = AppConfig(TASK_ID="task01", LOG_LEVEL="INFO")
         service = ManagerService(
             client=mock_client, config=mock_config, nats_subject="rec.control"
         )
@@ -222,7 +222,7 @@ class TestNATSCommunication:
         mock_client = AsyncMock()
         mock_client.send_command.return_value = mock_response
 
-        mock_config = AppConfig(task_id="task01", log_level="INFO")
+        mock_config = AppConfig(TASK_ID="task01", LOG_LEVEL="INFO")
         service = ManagerService(
             client=mock_client, config=mock_config, nats_subject="rec.control"
         )
@@ -251,7 +251,7 @@ class TestNATSCommunication:
         mock_client = AsyncMock()
         mock_client.send_command.return_value = mock_response
 
-        mock_config = AppConfig(task_id="task01", log_level="INFO")
+        mock_config = AppConfig(TASK_ID="task01", LOG_LEVEL="INFO")
         service = ManagerService(
             client=mock_client, config=mock_config, nats_subject="rec.control"
         )

@@ -93,27 +93,29 @@ from core.config import app_config, nats_config
 from models.cmd import StartPayload, StopPayload
 from services.send_cmd import ManagerService
 
+
 async def main():
-    async with get_nats_client(nats_config.url, nats_config.timeout) as nats_client:
+    async with get_nats_client(nats_config.NATS_URL, nats_config.NATS_TIMEOUT) as nats_client:
         # Создаем сервис
         service = ManagerService(
             client=nats_client,
             config=app_config,
-            nats_subject=nats_config.subject,
-        )        
-      
+            nats_subject=nats_config.NATS_SUBJECT,
+        )
+
         # Запуск записи с кастомными параметрами
         start_params = StartPayload(vid_byterate=2500, segment_time=60)
         response = await service.start(payload=start_params)
         print(f"Started: {response.payload.file_path}")
-        
+
         # Проверка статуса
         status = await service.status()
         print(f"Status: {status.app_status}")
-        
+
         # Остановка записи
         stop_response = await service.stop(payload=StopPayload())
         print(f"Stopped at: {stop_response.payload.at_stopped}")
+
 
 asyncio.run(main())
 ```
@@ -137,12 +139,12 @@ async def main_async():
     """Async main function to run commands"""
     logger = logging.getLogger(__name__)
 
-    async with get_nats_client(nats_config.url, nats_config.timeout) as nats_client:
+    async with get_nats_client(nats_config.NATS_URL, nats_config.NATS_TIMEOUT) as nats_client:
         # Сервис создается один раз и переиспользуется
         recording_service = ManagerService(
             client=nats_client,
             config=app_config,
-            nats_subject=nats_config.subject,
+            nats_subject=nats_config.NATS_SUBJECT,
         )
 
         try:
@@ -190,20 +192,20 @@ async def start_multiple_tasks() -> List[ResponseMessage]:
     используя asyncio.gather.
     """
     logger = logging.getLogger(__name__)
-    
+
     # 1. Получаем NATS-клиент через контекстный менеджер
-    async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+    async with get_nats_client(nats_config.NATS_URL, nats_config.NATS_TIMEOUT) as client:
         # 2. Инициализируем сервис
         service = ManagerService(
             client=client,
             config=app_config,
-            nats_subject=nats_config.subject,
+            nats_subject=nats_config.NATS_SUBJECT,
         )
-        
+
         # Список ID задач
         tasks = ["rec_task_A", "rec_task_B", "rec_task_C"]
         logger.info(f"Preparing to start {len(tasks)} tasks concurrently: {tasks}")
-        
+
         # Параметры по умолчанию, или можно использовать разные для каждой задачи
         default_payload = StartPayload(segment_time=120.0, vid_byterate=2500)
 
@@ -215,7 +217,7 @@ async def start_multiple_tasks() -> List[ResponseMessage]:
 
         # 4. Параллельно запускаем все команды и ожидаем результаты
         responses = await asyncio.gather(*commands, return_exceptions=True)
-        
+
         logger.info("--- Results Summary ---")
         for task_id, response in zip(tasks, responses):
             if isinstance(response, ResponseMessage):
@@ -229,7 +231,7 @@ async def start_multiple_tasks() -> List[ResponseMessage]:
                     f"Message: {response}"
                 )
         logger.info("-----------------------")
-        
+
         return responses
 ```
 
@@ -254,8 +256,8 @@ export LOG_LEVEL="INFO"  # DEBUG, INFO, WARNING, ERROR
 from core.config import nats_config, app_config
 
 # Изменение конфигурации
-nats_config.url = "nats://remote-server:4222"
-app_config.log_level = "DEBUG"
+nats_config.NATS_URL = "nats://remote-server:4222"
+app_config.LOG_LEVEL = "DEBUG"
 ```
 
 ## Формат сообщений

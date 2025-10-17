@@ -2,34 +2,28 @@
 
 import asyncio
 import logging
-import sys
 from typing import List
 
 from clients.nats_client import get_nats_client
 from core.config import app_config, nats_config
+from core.log import setup_logging, logger
 from models.cmd import StartPayload, StopPayload, ResponseMessage
 from services.send_cmd import ManagerService
 
-
-def setup_logging():
-    """Configure logging for the application"""
-    logging.basicConfig(
-        level=getattr(logging, app_config.log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
+logger.setLevel(logging.INFO)
 
 
 async def main_async():
     """Async main function to run commands"""
-    logger = logging.getLogger(__name__)
 
-    async with get_nats_client(nats_config.url, nats_config.timeout) as nats_client:
+    async with get_nats_client(
+        nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+    ) as nats_client:
         # Сервис создается один раз и переиспользуется
         recording_service = ManagerService(
             client=nats_client,
             config=app_config,
-            nats_subject=nats_config.subject,
+            nats_subject=nats_config.NATS_SUBJECT,
         )
 
         # ----------------------------------------------------------------------
@@ -78,15 +72,16 @@ async def start_multiple_tasks() -> List[ResponseMessage]:
     Параллельно отправляет команду 'start' для нескольких задач,
     используя asyncio.gather.
     """
-    logger = logging.getLogger(__name__)
 
     # 1. Получаем NATS-клиент через контекстный менеджер
-    async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+    async with get_nats_client(
+        nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+    ) as client:
         # 2. Инициализируем сервис
         service = ManagerService(
             client=client,
             config=app_config,
-            nats_subject=nats_config.subject,
+            nats_subject=nats_config.NATS_SUBJECT,
         )
 
         # Список ID задач

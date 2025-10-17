@@ -27,9 +27,11 @@ class TestRealNATSIntegration:
 
     async def test_start_command_response(self):
         """Тест реального ответа на команду start"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
             response = await service.start(payload=StartPayload())
 
@@ -55,9 +57,11 @@ class TestRealNATSIntegration:
 
     async def test_stop_command_response(self):
         """Тест реального ответа на команду stop"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
             response = await service.stop(payload=StopPayload())
 
@@ -84,9 +88,11 @@ class TestRealNATSIntegration:
 
     async def test_status_command_response(self):
         """Тест реального ответа на команду status"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
             response = await service.status()
 
@@ -105,9 +111,11 @@ class TestRealNATSIntegration:
 
     async def test_full_cycle_with_real_server(self):
         """Тест полного цикла работы с реальным сервером"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
 
             # 1. Запускаем запись
@@ -147,9 +155,11 @@ class TestRealNATSIntegration:
 
     async def test_response_timestamps_format(self):
         """Тест формата временных меток в ответах"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
             response = await service.start(payload=StartPayload())
 
@@ -172,9 +182,11 @@ class TestRealNATSIntegration:
 
     async def test_response_file_path_format(self):
         """Тест формата пути к файлу в ответах"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
             response = await service.start(payload=StartPayload())
 
@@ -188,9 +200,11 @@ class TestRealNATSIntegration:
 
     async def test_response_segment_time_consistency(self):
         """Тест согласованности segment_time в ответах"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
 
             start_response = await service.start(payload=StartPayload())
@@ -214,9 +228,11 @@ class TestRealNATSErrorHandling:
 
     async def test_multiple_start_commands(self):
         """Тест отправки нескольких команд start подряд"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
 
             response1 = await service.start(payload=StartPayload())
@@ -233,9 +249,11 @@ class TestRealNATSErrorHandling:
 
     async def test_stop_without_start(self):
         """Тест команды stop без предварительного start"""
-        async with get_nats_client(nats_config.url, nats_config.timeout) as client:
+        async with get_nats_client(
+            nats_config.NATS_URL, nats_config.NATS_TIMEOUT
+        ) as client:
             service = ManagerService(
-                client=client, config=app_config, nats_subject=nats_config.subject
+                client=client, config=app_config, nats_subject=nats_config.NATS_SUBJECT
             )
 
             # Сначала убедимся, что запись остановлена
