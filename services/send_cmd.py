@@ -2,6 +2,7 @@
 
 import logging
 from typing import Optional
+
 from nats.errors import ConnectionClosedError, TimeoutError as NatsTimeoutError
 
 from clients.nats_client import NatsClient

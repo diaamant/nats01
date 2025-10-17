@@ -2,8 +2,8 @@
 
 import json
 import logging
-from typing import Optional
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from nats.aio.client import Client as NATS
 from nats.errors import (

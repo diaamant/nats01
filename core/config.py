@@ -1,8 +1,6 @@
-# config_pydantic_analogue.py (Скорректированный)
 import json
 from pathlib import Path
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 env_path = Path(__file__).parent.parent / ".env"
