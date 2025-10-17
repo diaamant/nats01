@@ -6,14 +6,18 @@ from typing import Optional
 from contextlib import asynccontextmanager
 
 from nats.aio.client import Client as NATS
-from nats.errors import TimeoutError as NATSTimeoutError, ConnectionClosedError
+from nats.errors import (
+    TimeoutError as NATSTimeoutError,
+    ConnectionClosedError,
+    NoRespondersError,
+)
 
 from models.cmd import CommandMessage, ResponseMessage
 
 logger = logging.getLogger(__name__)
 
 
-class NATSClient:
+class NatsClient:
     """
     NATS client для управления подключением и отправки команд.
 
@@ -84,6 +88,7 @@ class NATSClient:
             ConnectionError: Если нет подключения к NATS
             TimeoutError: Если превышен таймаут ожидания ответа
             ValueError: Если получен некорректный ответ
+            NoRespondersError: Если нет доступных обработчиков для запроса
         """
         if not self.is_connected:
             raise ConnectionError("Not connected to NATS server")
@@ -105,6 +110,16 @@ class NATSClient:
                 f"status={reply.msg_status}, app_status={reply.app_status}"
             )
             return reply
+
+        except NoRespondersError as e:
+            logger.error(
+                f"No responders available for command {command.cmd} on subject {subject}. "
+                "Make sure the application handler is running."
+            )
+            raise ConnectionError(
+                f"No responders available for request on {subject}. "
+                "The application handler may not be running."
+            ) from e
 
         except NATSTimeoutError as e:
             logger.error(f"NATS request timeout for command {command.cmd}")
@@ -151,7 +166,7 @@ async def get_nats_client(nats_url: str = "nats://localhost:4222", timeout: int 
     Yields:
         NATSClient: Подключенный клиент
     """
-    client = NATSClient(nats_url=nats_url, timeout=timeout)
+    client = NatsClient(nats_url=nats_url, timeout=timeout)
     try:
         await client.connect()
         yield client

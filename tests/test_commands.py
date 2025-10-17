@@ -13,8 +13,11 @@ from models.cmd import (
     CommandPayload,
     ResponseMessage,
     ResponsePayload,
+    StartPayload,
+    StopPayload,
 )
-from services.send_cmd import send_cmd_start, send_cmd_stop, send_cmd_status
+from services.send_cmd import ManagerService
+from core.config import AppConfig
 
 
 class TestCommandModels:
@@ -171,7 +174,7 @@ class TestResponseModels:
 
 
 class TestNATSCommunication:
-    """Тесты для взаимодействия с NATS через новый NATSClient"""
+    """Тесты для взаимодействия с NATS через ManagerService"""
 
     @pytest.mark.asyncio
     async def test_send_start_command(self):
@@ -186,19 +189,20 @@ class TestNATSCommunication:
             ),
         )
 
-        with patch("services.send_cmd.get_nats_client") as mock_get_client:
-            mock_client = AsyncMock()
-            mock_client.__aenter__.return_value = mock_client
-            mock_client.__aexit__.return_value = None
-            mock_client.send_command.return_value = mock_response
-            mock_get_client.return_value = mock_client
+        mock_client = AsyncMock()
+        mock_client.send_command.return_value = mock_response
 
-            response = await send_cmd_start()
+        mock_config = AppConfig(task_id="task01", log_level="INFO")
+        service = ManagerService(
+            client=mock_client, config=mock_config, nats_subject="rec.control"
+        )
 
-            assert response.task_id == "task01"
-            assert response.app_status == "started"
-            assert response.payload.file_path == "/mnt/rec001.wav"
-            mock_client.send_command.assert_called_once()
+        response = await service.start(payload=StartPayload())
+
+        assert response.task_id == "task01"
+        assert response.app_status == "started"
+        assert response.payload.file_path == "/mnt/rec001.wav"
+        mock_client.send_command.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_stop_command(self):
@@ -215,19 +219,20 @@ class TestNATSCommunication:
             ),
         )
 
-        with patch("services.send_cmd.get_nats_client") as mock_get_client:
-            mock_client = AsyncMock()
-            mock_client.__aenter__.return_value = mock_client
-            mock_client.__aexit__.return_value = None
-            mock_client.send_command.return_value = mock_response
-            mock_get_client.return_value = mock_client
+        mock_client = AsyncMock()
+        mock_client.send_command.return_value = mock_response
 
-            response = await send_cmd_stop()
+        mock_config = AppConfig(task_id="task01", log_level="INFO")
+        service = ManagerService(
+            client=mock_client, config=mock_config, nats_subject="rec.control"
+        )
 
-            assert response.task_id == "task01"
-            assert response.app_status == "stopped"
-            assert response.payload.at_stopped == "2025-10-15T09:00:00Z"
-            mock_client.send_command.assert_called_once()
+        response = await service.stop(payload=StopPayload())
+
+        assert response.task_id == "task01"
+        assert response.app_status == "stopped"
+        assert response.payload.at_stopped == "2025-10-15T09:00:00Z"
+        mock_client.send_command.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_status_command(self):
@@ -243,19 +248,20 @@ class TestNATSCommunication:
             ),
         )
 
-        with patch("services.send_cmd.get_nats_client") as mock_get_client:
-            mock_client = AsyncMock()
-            mock_client.__aenter__.return_value = mock_client
-            mock_client.__aexit__.return_value = None
-            mock_client.send_command.return_value = mock_response
-            mock_get_client.return_value = mock_client
+        mock_client = AsyncMock()
+        mock_client.send_command.return_value = mock_response
 
-            response = await send_cmd_status()
+        mock_config = AppConfig(task_id="task01", log_level="INFO")
+        service = ManagerService(
+            client=mock_client, config=mock_config, nats_subject="rec.control"
+        )
 
-            assert response.task_id == "task01"
-            assert response.app_status == "started"
-            assert response.payload.file_path == "/mnt/rec001.wav"
-            mock_client.send_command.assert_called_once()
+        response = await service.status()
+
+        assert response.task_id == "task01"
+        assert response.app_status == "started"
+        assert response.payload.file_path == "/mnt/rec001.wav"
+        mock_client.send_command.assert_called_once()
 
 
 class TestCommandValidation:
